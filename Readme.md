@@ -11,6 +11,18 @@
                                                /_/ 
 </pre>
 
+## 介绍
+
+调用 [Swaks](https://github.com/jetmore/swaks) 实现批量发送邮件，此外还基于 [JinJa2](https://jinja.palletsprojects.com/) 实现了 HTML 邮件模板。支持：
+
++ 批量邮件发送，并且支持自定义发送时间间隔
+
++ 使用指定账号登录 SMTP 服务器发送邮件
+
++ 指定 EML 文件发送
+
++ 使用 HTML 文件作为邮件模板，通过命令行指定参数注入到 HTML 模板中，实现动态邮件内容
+
 ## 快速开始
 
 ```bash
