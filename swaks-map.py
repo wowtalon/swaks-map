@@ -1,5 +1,6 @@
 import argparse
 import os
+import tempfile
 from colorama import Fore
 from time import sleep, strftime, localtime
 from jinja2 import Template
@@ -7,6 +8,8 @@ from validate_email import validate_email
 
 
 def parse_vars(vars):
+    if not vars:
+        return {}
     ret = {}
     for var in vars:
         k, v = var.split('=')
@@ -14,7 +17,12 @@ def parse_vars(vars):
     return ret
 
 
-def make_inst(args, mail_to):
+def make_inst(args, mail_to, tf):
+    '''
+    args: ArgumentParser.parse_args()
+    mail_to: 收件人邮箱
+    tf: 临时文件实例，用于存储生成的临时邮件内容
+    '''
     options = []
     # 制定了 EML 时，发送 EML
     if args.eml:
@@ -36,8 +44,9 @@ def make_inst(args, mail_to):
         vars['time'] = strftime('%H:%M:%S', now_time)
         vars['datetime'] = strftime('%Y-%m-%d %H:%M:%S', now_time)
         content = template.render(vars)
+        tf.write(content.encode('utf-8'))
         options.append('--attach-type text/html')
-        options.append(f'--attach-body \'{content}\'')
+        options.append(f'--attach-body @{tf.name}')
         options.append(f'--header \'Subject: {args.subject}\'')
     # 发送普通文本
     else:
@@ -56,6 +65,9 @@ def make_inst(args, mail_to):
 
 
 def parse_result(resp):
+    '''
+    resp: Swaks 在终端界面输出的内容
+    '''
     resp = resp.split('\n')
     '<-  250'
     if resp[-5][:7] == '<-  250':
@@ -67,13 +79,17 @@ def parse_result(resp):
 def send_mail(mail_to):
     '''
     调用 Swaks 发送邮件
+
+    mail_to: 收件人邮箱
     '''
+    tf = tempfile.NamedTemporaryFile()
     # 构造发送邮件的参数
-    inst = make_inst(args, mail_to)
+    inst = make_inst(args, mail_to, tf)
     cmd = f'swaks --to {mail_to} {inst}'
     # print(cmd)
     # os.system(cmd)
     resp = os.popen(cmd).read()
+    tf.close()
     ret = parse_result(resp)
     if ret is True:
         print(Fore.GREEN + f'[*] 发送到 {mail_to} 成功' + Fore.RESET)
@@ -83,6 +99,9 @@ def send_mail(mail_to):
 
 
 def run(args):
+    '''
+    入口函数
+    '''
     with open(args.output, 'a+') as output_file:
         # 逐个账号发送邮件
         for email in args.to:
