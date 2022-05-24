@@ -2,6 +2,8 @@
 
 ---
 
+<img src="https://img.shields.io/badge/python-v3.10-blue" />
+
 <pre>
    _____               __              __  ___          
   / ___/      ______ _/ /_______      /  |/  /___ _____ 
