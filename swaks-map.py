@@ -57,8 +57,8 @@ def make_inst(args, mail_to):
 
 def parse_result(resp):
     resp = resp.split('\n')
-    '<-  250 Mail OK'
-    if resp[-5][:15] == '<-  250 Mail OK':
+    '<-  250'
+    if resp[-5][:7] == '<-  250':
         return True
     else:
         return resp[-5]
