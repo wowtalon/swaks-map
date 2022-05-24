@@ -38,13 +38,19 @@ def make_inst(args, mail_to, tf):
             html = html_file.read()
         template = Template(html)
         vars = parse_vars(args.vars)
+        # -> 注入内置变量
         now_time = localtime()
+        to_user, to_domain = mail_to.split('@')
+        vars['to_user'] = to_user
+        vars['to_domain'] = to_domain
         vars['mail_to'] = mail_to
         vars['date'] = strftime('%Y-%m-%d', now_time)
         vars['time'] = strftime('%H:%M:%S', now_time)
         vars['datetime'] = strftime('%Y-%m-%d %H:%M:%S', now_time)
+        # <- 注入结束
         content = template.render(vars)
         tf.write(content.encode('utf-8'))
+        tf.flush()
         options.append('--attach-type text/html')
         options.append(f'--attach-body @{tf.name}')
         options.append(f'--header \'Subject: {args.subject}\'')
