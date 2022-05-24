@@ -39,8 +39,54 @@ python swaks-map.py -h
 
 ## 发送邮件
 
+### 发送单封邮件
+
 ```bash
-python swaks-map --to wowtalon@gmail.com
+python swaks-map.py --to wowtalon@gmail.com
 ```
 
 ![](assets/sendok.png)
+
+### 批量发送
+
+```bash
+python swaks-map.py --to emails.txt
+```
+
+### 登录 SMTP 发送
+
+```bash
+python swaks-map.py --to emails.txt --server smtp.163.com --au xxxx@163.com --ap xxx --mail-from xxxx@163.com
+```
+
+### HTML 模板发送
+
+```html
+<!-- test.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+</head>
+<body>
+    <h1>你好，{{ name }}</h1><!-- 通过命令行指定的变量 -->
+    <p>{{ date }}</p><!-- 内置变量 -->
+    <p>{{ time }}</p><!-- 内置变量 -->
+    <p>{{ datetime }}</p><!-- 内置变量 -->
+    <p>{{ mail_to }}</p><!-- 内置变量 -->
+</body>
+</html>
+```
+
+```bash
+python swaks-map.py --to wowtalon@gmail.com --html test.html --vars "name=Talon"
+```
+
+![](assets/html.png)
+
+收件截图：
+
+![](assets/html-mail.png)
