@@ -65,6 +65,8 @@ def make_inst(args, mail_to, tf):
         options.append(f'--ap {args.ap}')
     if args.mail_from:
         options.append(f'--from {args.mail_from}')
+    if args.attach:
+        options.append(f'--attach @{args.attach}')
     # 加上 UA
     options.append('--header-X-Mailer \'Swaks Map v0.1 github.com/wowtalon/swaks-map/\'')
     return ' '.join(options)
@@ -146,8 +148,9 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     mail_group.add_argument('--mail-from', help='指定发件人的邮箱账号')
     mail_group.add_argument('--to', help='指定邮件接收人的邮箱账号或包含多个邮箱账号的文件', action='append', required=True)
     mail_group.add_argument('--header', help='指定邮件header', action='append')
-    mail_group.add_argument('--body', help='指定想要发送邮件内容', default='Hello, World!')
-    mail_group.add_argument('--subject', help='指定想要发送邮件标题', default='Test Mail From Swaks-Map')
+    mail_group.add_argument('--body', help='指定想要发送的邮件内容', default='Hello, World!')
+    mail_group.add_argument('--subject', help='指定想要发送的邮件标题', default='Test Mail From Swaks-Map')
+    mail_group.add_argument('--attach', help='指定想要发送的附件，如--attach test.zip')
     eml_group = parser.add_argument_group('EML模板')
     eml_group.add_argument('--eml', help='指定想要发送的EML文件')
     eml_group.add_argument('--html', help='指定想要发送的HTML模板')
