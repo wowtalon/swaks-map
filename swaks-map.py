@@ -69,6 +69,7 @@ def make_inst(args: argparse.Namespace, mail_to: str, tf: tempfile._TemporaryFil
         options.append(f'--ap {args.ap}')
     if args.mail_from:
         options.append(f'--from {args.mail_from}')
+        options.append(f'--h-From \'{args.fnickname} <{args.mail_from}>\'')
     if args.attach:
         options.append(f'--attach @{args.attach}')
     # 加上 UA
@@ -198,6 +199,7 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     parser = argparse.ArgumentParser()
     mail_group = parser.add_argument_group('邮件配置')
     mail_group.add_argument('--mail-from', help='指定发件人的邮箱账号')
+    mail_group.add_argument('--fnickname', help='指定发件人的别名，会显示在邮件发件人上，需要制定了发件人账号时才有效。')
     mail_group.add_argument('--to', help='指定邮件接收人的邮箱账号或包含多个邮箱账号的文件', action='append')
     mail_group.add_argument('--file', help='从文件指定发件人和收件人，一行一个')
     mail_group.add_argument('--header', help='指定邮件header', action='append')
