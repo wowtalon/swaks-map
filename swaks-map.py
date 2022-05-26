@@ -7,7 +7,11 @@ from jinja2 import Template
 from validate_email import validate_email
 
 
-def parse_vars(vars):
+def parse_vars(vars: list|None):
+    '''
+    将命令行传入的变量列表解析为字典，方便后面使用 Jinja2 渲染
+    vars: 格式为['varname=varvalue', ...]
+    '''
     if not vars:
         return {}
     ret = {}
@@ -17,7 +21,7 @@ def parse_vars(vars):
     return ret
 
 
-def make_inst(args, mail_to, tf):
+def make_inst(args: argparse.Namespace, mail_to: str, tf: tempfile._TemporaryFileWrapper):
     '''
     args: ArgumentParser.parse_args()
     mail_to: 收件人邮箱
@@ -72,19 +76,22 @@ def make_inst(args, mail_to, tf):
     return ' '.join(options)
 
 
-def parse_result(resp):
+def parse_result(resp: str):
     '''
     resp: Swaks 在终端界面输出的内容
     '''
-    resp = resp.split('\n')
-    '<-  250'
-    if resp[-5][:7] == '<-  250':
-        return True
-    else:
-        return resp[-5]
+    try:
+        resp = resp.split('\n')
+        '<-  250'
+        if resp[-5][:7] == '<-  250':
+            return True
+        else:
+            return resp[-5]
+    except:
+        return resp
 
 
-def send_mail(mail_to):
+def send_mail(mail_to: str, args: argparse.Namespace):
     '''
     调用 Swaks 发送邮件
 
@@ -94,8 +101,6 @@ def send_mail(mail_to):
     # 构造发送邮件的参数
     inst = make_inst(args, mail_to, tf)
     cmd = f'swaks --to {mail_to} {inst}'
-    # print(cmd)
-    # os.system(cmd)
     resp = os.popen(cmd).read()
     tf.close()
     ret = parse_result(resp)
@@ -106,30 +111,77 @@ def send_mail(mail_to):
     return resp
 
 
-def run(args):
+def send_mail_by_line(line: str, args: argparse.Namespace):
+    '''
+    从文件读取收件人和发件人，逐行发送邮件
+    line: 从文件读取的一行
+    args: ArgumentParser.parse_args()
+
+    line支持几种格式：
+    1. mail_to
+    2. mail_from,mail_to
+    3. au,ap,server,mail_from,mail_to
+    '''
+    orig_au = args.au
+    orig_ap = args.ap
+    orig_server = args.server
+    orig_from = args.mail_from
+    line = line.replace('\n', '')
+    comma_count = line.count(',')
+    if comma_count == 0:
+        resp = send_mail(line, args)
+    if comma_count == 1:
+        mail_from, mail_to = line.split(',')
+        args.mail_from = mail_from
+        resp = send_mail(mail_to, args)
+    if comma_count == 4:
+        au, ap, server, mail_from, mail_to = line.split(',')
+        args.au = au
+        args.ap = ap
+        args.server = server
+        args.mail_from = mail_from
+        resp = send_mail(mail_to, args)
+    # 重置
+    args.au = orig_au
+    args.ap = orig_ap
+    args.server = orig_server
+    args.mail_from = orig_from
+    return resp
+
+
+def run(args: argparse.Namespace):
     '''
     入口函数
     '''
     with open(args.output, 'a+') as output_file:
-        # 逐个账号发送邮件
-        for email in args.to:
-            if args.delay > 0:
-                sleep(args.delay)
-            if validate_email(email):
-                resp = send_mail(email)
-                output_file.write(resp)
-                continue
-            if os.path.isfile(email):
-                with open(email, 'r') as email_file:
-                    for mail_to in email_file:
-                        if args.delay > 0:
-                            sleep(args.delay)
-                        mail_to = mail_to.replace('\n', '')
-                        resp = send_mail(mail_to)
-                        output_file.write(resp)
-                continue
+        if args.file:
+            if not os.path.isfile(args.file):
+                raise FileNotFoundError(f'File invalid: {args.file}')
             else:
-                raise ValueError('Email invalid.')
+                with open(args.file, 'r') as email_file:
+                    for line in email_file:
+                        resp = send_mail_by_line(line, args)
+                        output_file.write(resp)
+        else:
+            # 逐个账号发送邮件
+            for email in args.to:
+                if args.delay > 0:
+                    sleep(args.delay)
+                if validate_email(email):
+                    resp = send_mail(email, args)
+                    output_file.write(resp)
+                    continue
+                if os.path.isfile(email):
+                    with open(email, 'r') as email_file:
+                        for mail_to in email_file:
+                            if args.delay > 0:
+                                sleep(args.delay)
+                            mail_to = mail_to.replace('\n', '')
+                            resp = send_mail(mail_to, args)
+                            output_file.write(resp)
+                    continue
+                else:
+                    raise ValueError(f'Email invalid:{email}.')
 
 
 if __name__ == '__main__':
@@ -146,7 +198,8 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     parser = argparse.ArgumentParser()
     mail_group = parser.add_argument_group('邮件配置')
     mail_group.add_argument('--mail-from', help='指定发件人的邮箱账号')
-    mail_group.add_argument('--to', help='指定邮件接收人的邮箱账号或包含多个邮箱账号的文件', action='append', required=True)
+    mail_group.add_argument('--to', help='指定邮件接收人的邮箱账号或包含多个邮箱账号的文件', action='append')
+    mail_group.add_argument('--file', help='从文件指定发件人和收件人，一行一个')
     mail_group.add_argument('--header', help='指定邮件header', action='append')
     mail_group.add_argument('--body', help='指定想要发送的邮件内容', default='Hello, World!')
     mail_group.add_argument('--subject', help='指定想要发送的邮件标题', default='Test Mail From Swaks-Map')
