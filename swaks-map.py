@@ -1,6 +1,10 @@
+#!/usr/bin/python3
+# -*- coding: UTF8 -*-
+
 import argparse
 import os
 import tempfile
+from base64 import b64encode
 from colorama import Fore
 from time import sleep, strftime, localtime
 from jinja2 import Template
@@ -21,7 +25,7 @@ def parse_vars(vars: list):
     return ret
 
 
-def make_inst(args: argparse.Namespace, mail_to: str, tf: tempfile._TemporaryFileWrapper):
+def make_inst(args, mail_to, tf):
     '''
     args: ArgumentParser.parse_args()
     mail_to: 收件人邮箱
@@ -57,11 +61,13 @@ def make_inst(args: argparse.Namespace, mail_to: str, tf: tempfile._TemporaryFil
         tf.flush()
         options.append('--attach-type text/html')
         options.append(f'--attach-body @{tf.name}')
-        options.append(f'--header \'Subject: {args.subject}\'')
+        subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
+        options.append(f'--header \'Subject: =?UTF-8?B?{subject_b64}?=\'')
     # 发送普通文本
     else:
         options.append(f'--body \'{args.body}\'')
-        options.append(f'--header \'Subject: {args.subject}\'')
+        subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
+        options.append(f'--header \'Subject: =?UTF-8?B?{subject_b64}?=\'')
     # 通过指定的 SMTP 账号发送邮件
     if args.au and args.ap and args.server:
         options.append(f'--server {args.server}')
@@ -86,7 +92,7 @@ def make_inst(args: argparse.Namespace, mail_to: str, tf: tempfile._TemporaryFil
     return ' '.join(options)
 
 
-def parse_result(resp: str):
+def parse_result(resp):
     '''
     resp: Swaks 在终端界面输出的内容
     '''
@@ -101,7 +107,7 @@ def parse_result(resp: str):
         return resp
 
 
-def send_mail(mail_to: str, args: argparse.Namespace):
+def send_mail(mail_to, args):
     '''
     调用 Swaks 发送邮件
 
@@ -124,7 +130,7 @@ def send_mail(mail_to: str, args: argparse.Namespace):
     return resp
 
 
-def send_mail_by_line(line: str, args: argparse.Namespace):
+def send_mail_by_line(line, args):
     '''
     从文件读取收件人和发件人，逐行发送邮件
     line: 从文件读取的一行
@@ -162,7 +168,7 @@ def send_mail_by_line(line: str, args: argparse.Namespace):
     return resp
 
 
-def run(args: argparse.Namespace):
+def run(args):
     '''
     入口函数
     '''
