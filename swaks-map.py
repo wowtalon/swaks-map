@@ -83,10 +83,11 @@ def make_inst(args, mail_to, tf):
     if args.cc:
         ccs = []
         for cc in args.cc:
-            cc_to, = cc.split('@')
-            ccs.append(f'${cc_to} <${cc}>')
+            cc_to, cc_domain = cc.split('@')
+            ccs.append(f'{cc_to} <{cc}>')
         cc_header = ', '.join(ccs)
-        options.append(f'--header \'Cc: ${cc_header}\'')
+        options.append(f'--header \'Cc: {cc_header}\'')
+        options.append(f'--header \'To: {mail_to}\'')
     # 加上 UA
     options.append('--header-X-Mailer \'Swaks Map v0.1 github.com/wowtalon/swaks-map/\'')
     return ' '.join(options)
