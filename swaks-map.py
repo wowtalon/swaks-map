@@ -7,7 +7,7 @@ from jinja2 import Template
 from validate_email import validate_email
 
 
-def parse_vars(vars: list|None):
+def parse_vars(vars: list):
     '''
     将命令行传入的变量列表解析为字典，方便后面使用 Jinja2 渲染
     vars: 格式为['varname=varvalue', ...]
@@ -71,7 +71,16 @@ def make_inst(args: argparse.Namespace, mail_to: str, tf: tempfile._TemporaryFil
         options.append(f'--from {args.mail_from}')
         options.append(f'--h-From \'{args.fnickname} <{args.mail_from}>\'')
     if args.attach:
+        # TODO 中文附件名存在乱码的问题！
         options.append(f'--attach @{args.attach}')
+    # 抄送
+    if args.cc:
+        ccs = []
+        for cc in args.cc:
+            cc_to, = cc.split('@')
+            ccs.append(f'${cc_to} <${cc}>')
+        cc_header = ', '.join(ccs)
+        options.append(f'--header \'Cc: ${cc_header}\'')
     # 加上 UA
     options.append('--header-X-Mailer \'Swaks Map v0.1 github.com/wowtalon/swaks-map/\'')
     return ' '.join(options)
@@ -101,6 +110,9 @@ def send_mail(mail_to: str, args: argparse.Namespace):
     tf = tempfile.NamedTemporaryFile()
     # 构造发送邮件的参数
     inst = make_inst(args, mail_to, tf)
+    if args.cc:
+        mail_to += ','
+        mail_to += ','.join(args.cc)
     cmd = f'swaks --to {mail_to} {inst}'
     resp = os.popen(cmd).read()
     tf.close()
@@ -161,6 +173,8 @@ def run(args: argparse.Namespace):
             else:
                 with open(args.file, 'r') as email_file:
                     for line in email_file:
+                        if args.delay > 0:
+                            sleep(args.delay)
                         resp = send_mail_by_line(line, args)
                         output_file.write(resp)
         else:
@@ -202,6 +216,7 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     mail_group.add_argument('--fnickname', help='指定发件人的别名，会显示在邮件发件人上，需要制定了发件人账号时才有效。')
     mail_group.add_argument('--to', help='指定邮件接收人的邮箱账号或包含多个邮箱账号的文件', action='append')
     mail_group.add_argument('--file', help='从文件指定发件人和收件人，一行一个')
+    mail_group.add_argument('--cc', help='指定抄送目标', action='append')
     mail_group.add_argument('--header', help='指定邮件header', action='append')
     mail_group.add_argument('--body', help='指定想要发送的邮件内容', default='Hello, World!')
     mail_group.add_argument('--subject', help='指定想要发送的邮件标题', default='Test Mail From Swaks-Map')
