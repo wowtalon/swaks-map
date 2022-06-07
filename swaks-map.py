@@ -171,7 +171,7 @@ def preset_args(args):
     预处理 args
     '''
     if args.cc:
-        args.to = args.to.extend(args.cc)
+        args.to.extend(args.cc)
     return args
 
 
