@@ -117,9 +117,6 @@ def send_mail(mail_to, args):
     tf = tempfile.NamedTemporaryFile()
     # 构造发送邮件的参数
     inst = make_inst(args, mail_to, tf)
-    if args.cc:
-        mail_to += ','
-        mail_to += ','.join(args.cc)
     cmd = f'swaks --to {mail_to} {inst}'
     resp = os.popen(cmd).read()
     tf.close()
@@ -169,6 +166,15 @@ def send_mail_by_line(line, args):
     return resp
 
 
+def preset_args(args):
+    '''
+    预处理 args
+    '''
+    if args.cc:
+        args.to = args.to.extend(args.cc)
+    return args
+
+
 def run(args):
     '''
     入口函数
@@ -184,26 +190,25 @@ def run(args):
                             sleep(args.delay)
                         resp = send_mail_by_line(line, args)
                         output_file.write(resp)
-        else:
-            # 逐个账号发送邮件
-            for email in args.to:
-                if args.delay > 0:
-                    sleep(args.delay)
-                if validate_email(email):
-                    resp = send_mail(email, args)
-                    output_file.write(resp)
-                    continue
-                if os.path.isfile(email):
-                    with open(email, 'r') as email_file:
-                        for mail_to in email_file:
-                            if args.delay > 0:
-                                sleep(args.delay)
-                            mail_to = mail_to.replace('\n', '')
-                            resp = send_mail(mail_to, args)
-                            output_file.write(resp)
-                    continue
-                else:
-                    raise ValueError(f'Email invalid:{email}.')
+        # 逐个账号发送邮件
+        for email in args.to:
+            if args.delay > 0:
+                sleep(args.delay)
+            if validate_email(email):
+                resp = send_mail(email, args)
+                output_file.write(resp)
+                continue
+            if os.path.isfile(email):
+                with open(email, 'r') as email_file:
+                    for mail_to in email_file:
+                        if args.delay > 0:
+                            sleep(args.delay)
+                        mail_to = mail_to.replace('\n', '')
+                        resp = send_mail(mail_to, args)
+                        output_file.write(resp)
+                continue
+            else:
+                raise ValueError(f'Email invalid:{email}.')
 
 
 if __name__ == '__main__':
@@ -241,4 +246,5 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     misc_group = parser.add_argument_group('其他配置')
     misc_group.add_argument('--delay', help='指定发送时间间隔，单位：秒，默认值为1', type=int, default=1)
     args = parser.parse_args()
+    args = preset_args(args)
     run(args)
