@@ -4,10 +4,12 @@
 import argparse
 import os
 import tempfile
+import src.swaks as swaks
 from base64 import b64encode
 from colorama import Fore
-from time import sleep, strftime, localtime
-from jinja2 import Template
+from getpass import getuser
+from time import sleep
+from socket import gethostname
 from validate_email import validate_email
 
 
@@ -23,74 +25,6 @@ def parse_vars(vars: list):
         k, v = var.split('=')
         ret[k] = v
     return ret
-
-
-def make_inst(args, mail_to, tf):
-    '''
-    args: ArgumentParser.parse_args()
-    mail_to: 收件人邮箱
-    tf: 临时文件实例，用于存储生成的临时邮件内容
-    '''
-    options = []
-    # 制定了 EML 时，发送 EML
-    if args.eml:
-        if not os.path.isfile(args.eml):
-            raise FileNotFoundError('EML file not found.')
-        else:
-            options.append(f'--data {args.eml}')
-    # 指定了 HTML 时，渲染 HTML 模板进行发送
-    if args.html:
-        if not os.path.isfile(args.html):
-            raise FileNotFoundError('HTML file not found.')
-        with open(args.html, 'r') as html_file:
-            html = html_file.read()
-        template = Template(html)
-        vars = parse_vars(args.vars)
-        # -> 注入内置变量
-        now_time = localtime()
-        to_user, to_domain = mail_to.split('@')
-        vars['to_user'] = to_user
-        vars['to_domain'] = to_domain
-        vars['mail_to'] = mail_to
-        vars['date'] = strftime('%Y-%m-%d', now_time)
-        vars['time'] = strftime('%H:%M:%S', now_time)
-        vars['datetime'] = strftime('%Y-%m-%d %H:%M:%S', now_time)
-        # <- 注入结束
-        content = template.render(vars)
-        tf.write(content.encode('utf-8'))
-        tf.flush()
-        options.append('--attach-type text/html')
-        options.append(f'--attach-body @{tf.name}')
-        subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
-        options.append(f'--header \'Subject: =?UTF-8?B?{subject_b64}?=\'')
-    # 发送普通文本
-    else:
-        options.append(f'--body \'{args.body}\'')
-        subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
-        options.append(f'--header \'Subject: =?UTF-8?B?{subject_b64}?=\'')
-    # 通过指定的 SMTP 账号发送邮件
-    if args.au and args.ap and args.server:
-        options.append(f'--server {args.server}')
-        options.append(f'--au {args.au}')
-        options.append(f'--ap {args.ap}')
-    if args.mail_from:
-        options.append(f'--from {args.mail_from}')
-        options.append(f'--h-From \'{args.fnickname} <{args.mail_from}>\'')
-    if args.attach:
-        # TODO 中文附件名存在乱码的问题！
-        options.append(f'--attach @{args.attach}')
-    # 抄送
-    if args.cc:
-        ccs = []
-        for cc in args.cc:
-            cc_to, cc_domain = cc.split('@')
-            ccs.append(f'{cc_to} <{cc}>')
-        cc_header = ', '.join(ccs)
-        options.append(f'--header \'Cc: {cc_header}\'')
-        options.append(f'--header \'To: {mail_to}\'')
-    # 加上 UA
-    options.append('--header-X-Mailer \'Swaks Map v0.1 github.com/wowtalon/swaks-map/\'')
-    return ' '.join(options)
 
 
 def parse_result(resp):
@@ -115,10 +49,16 @@ def send_mail(mail_to, args):
     mail_to: 收件人邮箱
     '''
     tf = tempfile.NamedTemporaryFile()
+    options = []
+    if args.html:
+        options = swaks.make_tpl_options(args, mail_to, parse_vars(args.vars), tf)
+        print(options)
+    elif args.eml:
+        options = swaks.make_eml_option(args)
+    else:
+        options = swaks.make_text_options(args)
     # 构造发送邮件的参数
-    inst = make_inst(args, mail_to, tf)
-    cmd = f'swaks --to {mail_to} {inst}'
-    resp = os.popen(cmd).read()
+    resp = swaks.invoke_swaks(mail_to, options)
     tf.close()
     ret = parse_result(resp)
     if ret is True:
@@ -170,8 +110,30 @@ def preset_args(args):
     '''
     预处理 args
     '''
+    args.header = {}
+    args.header['To'] = []
+    for mail_to in args.to:
+        to_user = mail_to.split('@')[0]
+        args.header['To'].append(f'{to_user} <{mail_to}>')
+    args.header['To'] = ','.join(args.header['To'])
     if args.cc:
+        h_cc = []
+        for cc in args.cc:
+            cc_user = cc.split('@')[0]
+            h_cc.append(f'{cc_user} <{cc}>')
+        args.header['Cc'] = ','.join(h_cc)
         args.to.extend(args.cc)
+    if args.subject:
+        subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
+        args.header['Subject'] = f'=?UTF-8?B?{subject_b64}?='
+    if not args.mail_from:
+        username = getuser()
+        hostname = gethostname()
+        args.mail_from = f'{username}@{hostname}'
+        if not args.fnickname:
+            args.fnickname = username
+    args.header['From'] = f'{args.fnickname} <{args.mail_from}>'
+    args.header['X-Mailer'] = 'Swaks Map v0.1 github.com/wowtalon/swaks-map/'
     return args
 
 
@@ -180,6 +142,7 @@ def run(args):
     入口函数
     '''
     with open(args.output, 'a+') as output_file:
+        # 从文件读取收件人
         if args.file:
             if not os.path.isfile(args.file):
                 raise FileNotFoundError(f'File invalid: {args.file}')
@@ -191,24 +154,15 @@ def run(args):
                         resp = send_mail_by_line(line, args)
                         output_file.write(resp)
         # 逐个账号发送邮件
-        for email in args.to:
-            if args.delay > 0:
-                sleep(args.delay)
-            if validate_email(email):
-                resp = send_mail(email, args)
-                output_file.write(resp)
-                continue
-            if os.path.isfile(email):
-                with open(email, 'r') as email_file:
-                    for mail_to in email_file:
-                        if args.delay > 0:
-                            sleep(args.delay)
-                        mail_to = mail_to.replace('\n', '')
-                        resp = send_mail(mail_to, args)
-                        output_file.write(resp)
-                continue
-            else:
-                raise ValueError(f'Email invalid:{email}.')
+        if args.to:
+            for email in args.to:
+                if args.delay > 0:
+                    sleep(args.delay)
+                if validate_email(email):
+                    resp = send_mail(email, args)
+                    output_file.write(resp)
+                else:
+                    raise ValueError(f'Email invalid:{email}.')
 
 
 if __name__ == '__main__':
