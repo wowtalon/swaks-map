@@ -126,12 +126,12 @@ def preset_args(args):
     if args.subject:
         subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
         args.header['Subject'] = f'=?UTF-8?B?{subject_b64}?='
+    username = getuser()
+    hostname = gethostname()
     if not args.mail_from:
-        username = getuser()
-        hostname = gethostname()
         args.mail_from = f'{username}@{hostname}'
-        if not args.fnickname:
-            args.fnickname = username
+    if not args.fnickname:
+        args.fnickname = username
     args.header['From'] = f'{args.fnickname} <{args.mail_from}>'
     args.header['X-Mailer'] = 'Swaks Map v0.1 github.com/wowtalon/swaks-map/'
     return args
