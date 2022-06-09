@@ -1,12 +1,17 @@
 import datetime
-import json
 import os
 from copy import deepcopy
+import re
 import tempfile
 from jinja2 import Template
 from time import strftime, localtime
 from eml_parser import EmlParser
-from base64 import b64decode
+from base64 import b64decode, b64encode
+
+
+def eml_base64(text):
+    text = b64encode(text.encode('utf-8')).decode('utf-8')
+    return f'=?UTF-8?B?{text}?='
 
 
 def parse_vars(vars: list):
@@ -99,28 +104,32 @@ def make_eml_option(mail_to, args):
         for h_key in header:
             if h_key not in ['to', 'from', 'content-type', 'x-mailer', 'subject']:
                 del eml['header'][h_key]
-        # print(json.dumps(eml, default=json_serial))
-        # print(eml['attachment'])
-        # print(parse)
+        subject = eml_base64(header['subject'])
+        options.append(f'--header \'Subject: {subject}\'')
         tf_attach = []
         if 'attachment' in eml:
             for attach in eml['attachment']:
-                print(attach['filename'])
                 _tf_attach = tempfile.NamedTemporaryFile()
                 _tf_attach.write(b64decode(attach['raw']))
                 _tf_attach.flush()
                 tf_attach.append(_tf_attach)
+                filename = eml_base64(attach["filename"])
+                options.append(f'--attach-name \'{filename}\'')
                 options.append(f'--attach @{_tf_attach.name}')
-                options.append(f'--attach-name \'{attach["filename"]}\'')
         tf_body = tempfile.NamedTemporaryFile()
         for body in eml['body']:
             if body['content_type'] == 'text/html':
-                tf_body.write(body['content'].encode('utf-8'))
+                print(body)
+                try:
+                    encoding = body['content_header']['content-type'][0].replace('\'', '"')
+                    encoding = re.findall('charset="(.*)"', encoding, re.IGNORECASE)[0]
+                except:
+                    encoding = 'utf-8'
+                tf_body.write(body['content'].encode(encoding))
                 tf_body.flush()
                 break
         options.append('--attach-type text/html')
         options.append(f'--attach-body @{tf_body.name}')
-        # options.append(f'--data @{args.eml}')
         resp =  invoke_swaks(mail_to, options)
         tf_body.close()
         for _tf_attach in tf_attach:
@@ -131,7 +140,6 @@ def make_eml_option(mail_to, args):
 def invoke_swaks(mail_to, options):
     options = ' '.join(options)
     cmd = f'swaks --to {mail_to} {options}'
-    # return cmd + '\n'
     print(cmd)
     resp = os.popen(cmd).read()
     return resp

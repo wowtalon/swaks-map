@@ -111,7 +111,7 @@ def preset_args(args):
             h_cc.append(f'{cc_user} <{cc}>')
         args.header['Cc'] = ','.join(h_cc)
         args.to.extend(args.cc)
-    if args.subject:
+    if args.subject and not args.eml:
         subject_b64 = b64encode(args.subject.encode('utf-8')).decode('utf-8')
         args.header['Subject'] = f'=?UTF-8?B?{subject_b64}?='
     username = getuser()
