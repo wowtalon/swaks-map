@@ -7,6 +7,8 @@ from jinja2 import Template
 from time import strftime, localtime
 from eml_parser import EmlParser
 
+from src.utils import echo_error
+
 
 def eml_base64(text):
     '''
@@ -45,8 +47,13 @@ def make_options(args):
     if args.mail_from:
         options.append(f'--from {args.mail_from}')
     if args.attach:
-        # TODO 中文附件名存在乱码的问题！
-        options.append(f'--attach @{args.attach}')
+        for attach in args.attach:
+            if not os.path.isfile(attach):
+                echo_error(f'Attachment not found: {attach}', exit_now=True)
+            attach_name = os.path.basename(attach)
+            attach_name = eml_base64(attach_name)
+            options.append(f'--attach-name \'{attach_name}\'')
+            options.append(f'--attach @{attach}')
     for header in args.header:
         options.append(f'--header \'{header}: {args.header[header]}\'')
     return options
@@ -68,7 +75,7 @@ def make_tpl_options(mail_to, args):
     vars = parse_vars(args.vars)
     options = make_options(args)
     if not os.path.isfile(args.html):
-        raise FileNotFoundError('HTML file not found.')
+        echo_error(f'HTML file not found: {args.html}', exit_now=True)
     with open(args.html, 'r') as html_file:
         html = html_file.read()
     template = Template(html)
@@ -98,7 +105,7 @@ def make_eml_option(mail_to, args):
     从 EML 文件发送邮件
     '''
     if not os.path.isfile(args.eml):
-        raise FileNotFoundError('EML file not found.')
+        echo_error(f'EML file not found: {args.eml}', exit_now=True)
     else:
         options = make_options(args)
         with open(args.eml, 'rb') as eml:

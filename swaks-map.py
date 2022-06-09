@@ -6,36 +6,11 @@ import os
 import tempfile
 import src.swaks as swaks
 from base64 import b64encode
-from colorama import Fore
 from getpass import getuser
 from time import sleep
 from socket import gethostname
 from validate_email import validate_email
-
-
-def echo_error(msg, exit_now=False):
-    print(Fore.RED + msg + Fore.RESET)
-    if exit_now:
-        exit()
-
-
-def echo_ok(msg):
-    print(Fore.GREEN + msg + Fore.RESET)
-
-
-def parse_result(resp):
-    '''
-    resp: Swaks 在终端界面输出的内容
-    '''
-    try:
-        resp = resp.split('\n')
-        '<-  250'
-        if resp[-5][:7] == '<-  250':
-            return True
-        else:
-            return resp[-5]
-    except:
-        return resp
+from src.utils import *
 
 
 def send_mail(mail_to, args):
@@ -50,9 +25,9 @@ def send_mail(mail_to, args):
     tf.close()
     ret = parse_result(resp)
     if ret is True:
-        echo_ok(f'[*] 发送到 {mail_to} 成功')
+        echo_ok(f'发送到 {mail_to} 成功')
     else:
-        echo_error(f'[x] 发送到 {mail_to} 失败\n[x] {ret}')
+        echo_error(f'发送到 {mail_to} 失败\n[x] {ret}')
     return resp
 
 
@@ -150,7 +125,7 @@ def run(args):
                     resp = send_mail(email, args)
                     output_file.write(resp)
                 else:
-                    echo_error(f'Email invalid:{email}.', exit_now=True)
+                    echo_error(f'Email invalid: {email}', exit_now=True)
 
 
 if __name__ == '__main__':
@@ -174,8 +149,8 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     mail_group.add_argument('--header', help='指定邮件header', action='append')
     mail_group.add_argument('--body', help='指定想要发送的邮件内容', default='Hello, World!')
     mail_group.add_argument('--subject', help='指定想要发送的邮件标题', default='Test Mail From Swaks-Map')
-    mail_group.add_argument('--attach', help='指定想要发送的附件，如--attach test.zip')
-    eml_group = parser.add_argument_group('EML模板')
+    mail_group.add_argument('--attach', help='指定想要发送的附件，如--attach test.zip', action='append')
+    eml_group = parser.add_argument_group('邮件模板配置')
     eml_group.add_argument('--eml', help='指定想要发送的EML文件')
     eml_group.add_argument('--html', help='指定想要发送的HTML模板')
     eml_group.add_argument('--vars', help='指定HTML模板中的变量，格式为key=val，如--vars \'name=张三\'', action='append')
