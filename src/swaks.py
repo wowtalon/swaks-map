@@ -1,6 +1,26 @@
+import datetime
+import json
 import os
+from copy import deepcopy
+import tempfile
 from jinja2 import Template
 from time import strftime, localtime
+from eml_parser import EmlParser
+from base64 import b64decode
+
+
+def parse_vars(vars: list):
+    '''
+    将命令行传入的变量列表解析为字典，方便后面使用 Jinja2 渲染
+    vars: 格式为['varname=varvalue', ...]
+    '''
+    if not vars:
+        return {}
+    ret = {}
+    for var in vars:
+        k, v = var.split('=')
+        ret[k] = v
+    return ret
 
 
 def make_options(args):
@@ -25,13 +45,15 @@ def make_options(args):
     return options
 
 
-def make_text_options(args):
+def make_text_options(mail_to, args):
     options = make_options(args)
     options.append(f'--body \'{args.body}\'')
-    return options
+    return invoke_swaks(mail_to, options)
 
 
-def make_tpl_options(args, mail_to, vars, tf):
+def make_tpl_options(mail_to, args ):
+    tf = tempfile.NamedTemporaryFile()
+    vars = parse_vars(args.vars)
     options = make_options(args)
     if not os.path.isfile(args.html):
         raise FileNotFoundError('HTML file not found.')
@@ -53,21 +75,73 @@ def make_tpl_options(args, mail_to, vars, tf):
     tf.flush()
     options.append('--attach-type text/html')
     options.append(f'--attach-body @{tf.name}')
-    return options
+    resp = invoke_swaks(mail_to, options)
+    tf.close()
+    return resp
 
 
-def make_eml_option(args):
-    options = make_options(args)
+def json_serial(obj):
+  if isinstance(obj, datetime.datetime):
+      serial = obj.isoformat()
+      return serial
+
+
+def make_eml_option(mail_to, args):
     if not os.path.isfile(args.eml):
         raise FileNotFoundError('EML file not found.')
     else:
-        options.append(f'--data @{args.eml}')
-    return options
+        options = make_options(args)
+        with open(args.eml, 'rb') as eml:
+            raw_email = eml.read()
+        parser = EmlParser(include_raw_body=True, include_attachment_data=True)
+        eml = parser.decode_email_bytes(raw_email)
+        header = deepcopy(eml['header'])
+        for h_key in header:
+            if h_key not in ['to', 'from', 'content-type', 'x-mailer', 'subject']:
+                del eml['header'][h_key]
+        print(json.dumps(eml, default=json_serial))
+        # print(eml['attachment'])
+        # print(parse)
+        tf_attach = []
+        if 'attachment' in eml:
+            for attach in eml['attachment']:
+                print(attach['filename'])
+                _tf_attach = tempfile.NamedTemporaryFile()
+                _tf_attach.write(b64decode(attach['raw']))
+                _tf_attach.flush()
+                tf_attach.append(_tf_attach)
+                options.append(f'--attach @{_tf_attach.name}')
+                options.append(f'--attach-name \'{attach["filename"]}\'')
+        tf_body = tempfile.NamedTemporaryFile()
+        for body in eml['body']:
+            if body['content_type'] == 'text/html':
+                tf_body.write(body['content'].encode('utf-8'))
+                tf_body.flush()
+                break
+        options.append('--attach-type text/html')
+        options.append(f'--attach-body @{tf_body.name}')
+        # options.append(f'--data @{args.eml}')
+        resp =  invoke_swaks(mail_to, options)
+        tf_body.close()
+        for _tf_attach in tf_attach:
+            _tf_attach.close()
+        return resp
 
 
 def invoke_swaks(mail_to, options):
     options = ' '.join(options)
     cmd = f'swaks --to {mail_to} {options}'
-    # return cmd + '\n'
+    return cmd + '\n'
     resp = os.popen(cmd).read()
+    return resp
+
+
+def send_mail(mail_to, args):
+    resp = ''
+    if args.html:
+        resp = make_tpl_options(mail_to, args)
+    elif args.eml:
+        resp = make_eml_option(mail_to, args)
+    else:
+        resp = make_text_options(mail_to, args)
     return resp

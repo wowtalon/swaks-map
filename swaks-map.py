@@ -13,18 +13,14 @@ from socket import gethostname
 from validate_email import validate_email
 
 
-def parse_vars(vars: list):
-    '''
-    将命令行传入的变量列表解析为字典，方便后面使用 Jinja2 渲染
-    vars: 格式为['varname=varvalue', ...]
-    '''
-    if not vars:
-        return {}
-    ret = {}
-    for var in vars:
-        k, v = var.split('=')
-        ret[k] = v
-    return ret
+def echo_error(msg, exit_now=False):
+    print(Fore.RED + msg + Fore.RESET)
+    if exit_now:
+        exit()
+
+
+def echo_ok(msg):
+    print(Fore.GREEN + msg + Fore.RESET)
 
 
 def parse_result(resp):
@@ -49,22 +45,14 @@ def send_mail(mail_to, args):
     mail_to: 收件人邮箱
     '''
     tf = tempfile.NamedTemporaryFile()
-    options = []
-    if args.html:
-        options = swaks.make_tpl_options(args, mail_to, parse_vars(args.vars), tf)
-        print(options)
-    elif args.eml:
-        options = swaks.make_eml_option(args)
-    else:
-        options = swaks.make_text_options(args)
     # 构造发送邮件的参数
-    resp = swaks.invoke_swaks(mail_to, options)
+    resp = swaks.send_mail(mail_to, args)
     tf.close()
     ret = parse_result(resp)
     if ret is True:
-        print(Fore.GREEN + f'[*] 发送到 {mail_to} 成功' + Fore.RESET)
+        echo_ok(f'[*] 发送到 {mail_to} 成功')
     else:
-        print(Fore.RED + f'[x] 发送到 {mail_to} 失败\n[x] {ret}' + Fore.RESET)
+        echo_error(f'[x] 发送到 {mail_to} 失败\n[x] {ret}')
     return resp
 
 
@@ -145,7 +133,7 @@ def run(args):
         # 从文件读取收件人
         if args.file:
             if not os.path.isfile(args.file):
-                raise FileNotFoundError(f'File invalid: {args.file}')
+                echo_error( f'File invalid: {args.file}', exit_now=True)
             else:
                 with open(args.file, 'r') as email_file:
                     for line in email_file:
@@ -162,7 +150,7 @@ def run(args):
                     resp = send_mail(email, args)
                     output_file.write(resp)
                 else:
-                    raise ValueError(f'Email invalid:{email}.')
+                    echo_error(f'Email invalid:{email}.', exit_now=True)
 
 
 if __name__ == '__main__':
@@ -200,5 +188,7 @@ V0.1 By wowtalon(https://github.com/wowtalon/swaks-map)
     misc_group = parser.add_argument_group('其他配置')
     misc_group.add_argument('--delay', help='指定发送时间间隔，单位：秒，默认值为1', type=int, default=1)
     args = parser.parse_args()
+    if not (args.file or args.to):
+        echo_error('Email not indicated, please indicate by --to or --file.', exit_now=True)
     args = preset_args(args)
     run(args)

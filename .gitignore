@@ -1,4 +1,5 @@
 venv/
 emls/
+tmp/
 *.txt
 src/__pycache__/

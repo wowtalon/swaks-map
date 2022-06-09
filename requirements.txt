@@ -1,2 +1,4 @@
 validate_email
 jinja2
+colorama
+eml_parser
