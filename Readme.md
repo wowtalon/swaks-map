@@ -2,7 +2,7 @@
 
 ---
 
-<img src="https://img.shields.io/badge/python-v3.10-blue" />
+<img src="https://img.shields.io/badge/python-v3.7-blue" />
 
 <pre>
    _____               __              __  ___          

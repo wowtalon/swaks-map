@@ -1,15 +1,17 @@
-import datetime
 import os
-from copy import deepcopy
 import re
 import tempfile
+from base64 import b64decode, b64encode
+from copy import deepcopy
 from jinja2 import Template
 from time import strftime, localtime
 from eml_parser import EmlParser
-from base64 import b64decode, b64encode
 
 
 def eml_base64(text):
+    '''
+    将文本 base64 编码后发送，可以解决中文乱码的问题
+    '''
     text = b64encode(text.encode('utf-8')).decode('utf-8')
     return f'=?UTF-8?B?{text}?='
 
@@ -51,13 +53,18 @@ def make_options(args):
 
 
 def make_text_options(mail_to, args):
+    '''
+    发送普通文本邮件
+    '''
     options = make_options(args)
     options.append(f'--body \'{args.body}\'')
     return invoke_swaks(mail_to, options)
 
 
-def make_tpl_options(mail_to, args ):
-    tf = tempfile.NamedTemporaryFile()
+def make_tpl_options(mail_to, args):
+    '''
+    从 HTML 模板发送邮件
+    '''
     vars = parse_vars(args.vars)
     options = make_options(args)
     if not os.path.isfile(args.html):
@@ -75,6 +82,7 @@ def make_tpl_options(mail_to, args ):
     vars['time'] = strftime('%H:%M:%S', now_time)
     vars['datetime'] = strftime('%Y-%m-%d %H:%M:%S', now_time)
     # <- 注入结束
+    tf = tempfile.NamedTemporaryFile()
     content = template.render(vars)
     tf.write(content.encode('utf-8'))
     tf.flush()
@@ -85,28 +93,29 @@ def make_tpl_options(mail_to, args ):
     return resp
 
 
-def json_serial(obj):
-  if isinstance(obj, datetime.datetime):
-      serial = obj.isoformat()
-      return serial
-
-
 def make_eml_option(mail_to, args):
+    '''
+    从 EML 文件发送邮件
+    '''
     if not os.path.isfile(args.eml):
         raise FileNotFoundError('EML file not found.')
     else:
         options = make_options(args)
         with open(args.eml, 'rb') as eml:
             raw_email = eml.read()
+        # 解析 EML 文件
         parser = EmlParser(include_raw_body=True, include_attachment_data=True)
         eml = parser.decode_email_bytes(raw_email)
         header = deepcopy(eml['header'])
+        # 去除无用的 header
         for h_key in header:
             if h_key not in ['to', 'from', 'content-type', 'x-mailer', 'subject']:
                 del eml['header'][h_key]
+        # 从 EML 中提取邮件标题
         subject = eml_base64(header['subject'])
         options.append(f'--header \'Subject: {subject}\'')
         tf_attach = []
+        # 从 EML 中提取附件
         if 'attachment' in eml:
             for attach in eml['attachment']:
                 _tf_attach = tempfile.NamedTemporaryFile()
@@ -116,11 +125,13 @@ def make_eml_option(mail_to, args):
                 filename = eml_base64(attach["filename"])
                 options.append(f'--attach-name \'{filename}\'')
                 options.append(f'--attach @{_tf_attach.name}')
+        # 从 EML 中提取正文
         tf_body = tempfile.NamedTemporaryFile()
         for body in eml['body']:
             if body['content_type'] == 'text/html':
-                print(body)
+                # 处理编码问题
                 try:
+                    # 尝试查找编码，找不到编码时默认使用 utf8
                     encoding = body['content_header']['content-type'][0].replace('\'', '"')
                     encoding = re.findall('charset="(.*)"', encoding, re.IGNORECASE)[0]
                 except:
@@ -131,6 +142,7 @@ def make_eml_option(mail_to, args):
         options.append('--attach-type text/html')
         options.append(f'--attach-body @{tf_body.name}')
         resp =  invoke_swaks(mail_to, options)
+        # 关闭临时文件
         tf_body.close()
         for _tf_attach in tf_attach:
             _tf_attach.close()
@@ -138,9 +150,9 @@ def make_eml_option(mail_to, args):
 
 
 def invoke_swaks(mail_to, options):
+    # 拼接 swaks 指令，调用 swaks 发送邮件
     options = ' '.join(options)
     cmd = f'swaks --to {mail_to} {options}'
-    print(cmd)
     resp = os.popen(cmd).read()
     return resp
 
