@@ -99,7 +99,7 @@ def make_eml_option(mail_to, args):
         for h_key in header:
             if h_key not in ['to', 'from', 'content-type', 'x-mailer', 'subject']:
                 del eml['header'][h_key]
-        print(json.dumps(eml, default=json_serial))
+        # print(json.dumps(eml, default=json_serial))
         # print(eml['attachment'])
         # print(parse)
         tf_attach = []
@@ -131,7 +131,8 @@ def make_eml_option(mail_to, args):
 def invoke_swaks(mail_to, options):
     options = ' '.join(options)
     cmd = f'swaks --to {mail_to} {options}'
-    return cmd + '\n'
+    # return cmd + '\n'
+    print(cmd)
     resp = os.popen(cmd).read()
     return resp
 
