@@ -68,17 +68,8 @@ def make_text_options(mail_to, args):
     return invoke_swaks(mail_to, options)
 
 
-def make_tpl_options(mail_to, args):
-    '''
-    从 HTML 模板发送邮件
-    '''
-    vars = parse_vars(args.vars)
-    options = make_options(args)
-    if not os.path.isfile(args.html):
-        echo_error(f'HTML file not found: {args.html}', exit_now=True)
-    with open(args.html, 'r') as html_file:
-        html = html_file.read()
-    template = Template(html)
+def render_tpl(content, mail_to, vars):
+    template = Template(content)
     # -> 注入内置变量
     now_time = localtime()
     to_user, to_domain = mail_to.split('@')
@@ -89,8 +80,22 @@ def make_tpl_options(mail_to, args):
     vars['time'] = strftime('%H:%M:%S', now_time)
     vars['datetime'] = strftime('%Y-%m-%d %H:%M:%S', now_time)
     # <- 注入结束
-    tf = tempfile.NamedTemporaryFile()
     content = template.render(vars)
+    return content
+
+
+def make_tpl_options(mail_to, args):
+    '''
+    从 HTML 模板发送邮件
+    '''
+    vars = parse_vars(args.vars)
+    options = make_options(args)
+    if not os.path.isfile(args.html):
+        echo_error(f'HTML file not found: {args.html}', exit_now=True)
+    with open(args.html, 'r') as html_file:
+        html = html_file.read()
+    tf = tempfile.NamedTemporaryFile()
+    content = render_tpl(html, mail_to, vars)
     tf.write(content.encode('utf-8'))
     tf.flush()
     options.append('--attach-type text/html')
@@ -143,7 +148,8 @@ def make_eml_option(mail_to, args):
                     encoding = re.findall('charset="(.*)"', encoding, re.IGNORECASE)[0]
                 except:
                     encoding = 'utf-8'
-                tf_body.write(body['content'].encode(encoding))
+                content = render_tpl(body['content'], mail_to, {})
+                tf_body.write(content.encode(encoding))
                 tf_body.flush()
                 break
         options.append('--attach-type text/html')
