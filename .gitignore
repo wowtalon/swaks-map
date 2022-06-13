@@ -3,3 +3,4 @@ emls/
 tmp/
 *.txt
 src/__pycache__/
+data/*

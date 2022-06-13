@@ -3,13 +3,13 @@
 
 import argparse
 import os
-import tempfile
 import src.swaks as swaks
 from base64 import b64encode
 from getpass import getuser
 from time import sleep
 from socket import gethostname
 from validate_email import validate_email
+from src.db import insert_record
 from src.utils import *
 
 
@@ -19,15 +19,15 @@ def send_mail(mail_to, args):
 
     mail_to: 收件人邮箱
     '''
-    tf = tempfile.NamedTemporaryFile()
     # 构造发送邮件的参数
     resp = swaks.send_mail(mail_to, args)
-    tf.close()
     ret = parse_result(resp)
     if ret is True:
         echo_ok(f'发送到 {mail_to} 成功')
+        insert_record(args.subject, mail_to, 'success')
     else:
         echo_error(f'发送到 {mail_to} 失败\n[x] {ret}')
+        insert_record(args.subject, mail_to, 'fail')
     return resp
 
 
