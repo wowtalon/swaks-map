@@ -148,7 +148,8 @@ def make_eml_option(mail_to, args):
                     encoding = re.findall('charset="(.*)"', encoding, re.IGNORECASE)[0]
                 except:
                     encoding = 'utf-8'
-                content = render_tpl(body['content'], mail_to, {})
+                vars = parse_vars(args.vars)
+                content = render_tpl(body['content'], mail_to, vars)
                 tf_body.write(content.encode(encoding))
                 tf_body.flush()
                 break
