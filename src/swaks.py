@@ -129,11 +129,13 @@ def make_eml_option(mail_to, args):
         tf_attach = []
         # 从 EML 中提取附件
         if 'attachment' in eml:
+            vars = parse_vars(args.vars)
             for attach in eml['attachment']:
                 _tf_attach = tempfile.NamedTemporaryFile()
                 _tf_attach.write(b64decode(attach['raw']))
                 _tf_attach.flush()
                 tf_attach.append(_tf_attach)
+                attach["filename"] = render_tpl(attach["filename"], mail_to, vars)
                 filename = eml_base64(attach["filename"])
                 options.append(f'--attach-name \'{filename}\'')
                 options.append(f'--attach @{_tf_attach.name}')
