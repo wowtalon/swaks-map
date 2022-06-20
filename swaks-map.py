@@ -83,9 +83,10 @@ def preset_args(args):
     args.header = header
     if 'To' not in args.header or len(args.header['To']) == 0:
         args.header['To'] = []
-        for mail_to in args.to:
-            to_user = mail_to.split('@')[0]
-            args.header['To'].append(f'{to_user} <{mail_to}>')
+        if args.to:
+            for mail_to in args.to:
+                to_user = mail_to.split('@')[0]
+                args.header['To'].append(f'{to_user} <{mail_to}>')
         args.header['To'] = ','.join(args.header['To'])
     if args.cc:
         h_cc = []
